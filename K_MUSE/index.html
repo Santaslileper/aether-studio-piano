@@ -434,9 +434,7 @@ resBox.addEventListener('click', async (e) => {
             // Try explicit mapping or fallback to slug
             const fileMap = {
                 'ludwig_van_beethoven_fur_elise': 'fur_elise_full.js',
-                'ludwig_van_beethoven_moonlight_sonata': 'moonlight_sonata.js',
-                'rush_e': 'rush_e.js',
-                'runaway_aurora': 'Runaway-Aurora.js' // preserving case for FS compatibility
+                'ludwig_van_beethoven_moonlight_sonata': 'moonlight_sonata.js'
             };
             
             const fileName = fileMap[slug] || (slug + '.js');
