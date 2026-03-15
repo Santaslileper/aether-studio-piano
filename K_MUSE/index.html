@@ -118,6 +118,13 @@
   .res-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #333; }
   .res-item:hover { background: #222; }
   .badge { font-size: 8px; padding: 2px 4px; border: 1px solid #fff; margin-left: 5px; }
+  #ld-btn {
+    background: #fff; color: #000; border: 1px solid #fff;
+    font-family: 'Courier New', monospace; font-size: 11px;
+    padding: 6px 12px; cursor: pointer; text-transform: uppercase;
+    transition: all 0.2s;
+  }
+  #ld-btn:hover { background: none; color: #fff; }
 
   /* ── GUIDE ── */
   #guide {
@@ -140,6 +147,8 @@
 <div id="controls">
   <div class="ctrl-row">
     <input type="text" id="sq" placeholder="SEARCH BITMIDI..." autocomplete="off">
+    <button id="ld-btn" onclick="document.getElementById('m-up').click()">LOAD</button>
+    <input type="file" id="m-up" accept=".mid,.midi,.json" style="display:none">
     <select id="is">
         <option value="Grand Piano">GRAND PIANO</option>
         <option value="Electric Piano 1 (Rhodes)">RHODES</option>
@@ -194,6 +203,7 @@ D. Quarter = 1.128   →  fills one full 3/8 measure</pre>
 
 <script type="module">
 import * as Tone from 'https://esm.sh/tone@15.1.22';
+import { Midi } from 'https://esm.sh/@tonejs/midi@2.0.28';
 import { CURATED_SONGS } from '../js/constants.js';
 
 let currentSong = null;
@@ -442,6 +452,53 @@ resBox.addEventListener('click', async (e) => {
 });
 
 document.addEventListener('click', (e) => { if (!sq.contains(e.target)) resBox.style.display = 'none'; });
+
+// ─── FILE LOADING ───────────────────────────────────────────────────────
+const mUp = document.getElementById('m-up');
+mUp.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    log("UPLOADING: " + file.name.toUpperCase());
+    
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+        try {
+            let data;
+            if (file.name.endsWith('.json')) {
+                data = JSON.parse(ev.target.result);
+                if (data.data) data = data.data; // Handle studio export wrapper
+            } else {
+                const midi = new Midi(ev.target.result);
+                data = [];
+                midi.tracks.forEach(track => {
+                    track.notes.forEach(note => {
+                        data.push({
+                            type: 'note',
+                            note: note.name,
+                            time: note.time,
+                            duration: note.duration,
+                            velocity: note.velocity
+                        });
+                    });
+                });
+            }
+            
+            if (!data || !data.length) throw new Error("INVALID DATA");
+            
+            document.getElementById('hdr').querySelector('h1').innerText = file.name.split('.')[0].replace(/_/g, ' ').toUpperCase();
+            document.getElementById('hdr').querySelector('h2').innerText = "LOCAL UPLOAD";
+            
+            window.measures = clusterNotes(data);
+            window.currentPage = 0;
+            render();
+            log("STABILIZED: " + file.name.toUpperCase());
+        } catch (err) {
+            log("LOAD ERROR: " + err.message);
+        }
+    };
+    if (file.name.endsWith('.json')) reader.readAsText(file);
+    else reader.readAsArrayBuffer(file);
+});
 
 // ─── PAGING ─────────────────────────────────────────────────────────────
 window.currentPage = 0;
