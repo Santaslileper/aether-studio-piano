@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aether Studio Piano</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;1,400&family=Inter:wght@300;400;500;600&family=Space+Mono&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="./assets/index-0bE1umqd.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Bz3rgqT0.css">
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container"></div>
+
+    <div class="overlay">
+
+      <header class="top-bar">
+        <div class="brand">
+          <span class="brand-name">Aether</span>
+          <span class="brand-sub">Studio Piano</span>
+        </div>
+
+        <div class="search-wrap">
+          <input type="text" id="song-search" placeholder="Search BitMidi or Library…" autocomplete="off">
+          <div id="search-results" class="dropdown hidden"></div>
+        </div>
+        <div id="octave-display">Octave: Normal</div>
+
+        <nav class="top-nav">
+          <select id="instrument-select" title="Choose instrument"></select>
+          <button id="record-btn" class="icon-btn" title="Record">⏺</button>
+          <button id="replay-btn" class="icon-btn hidden" title="Play recording">▶ REC</button>
+          <button id="fullscreen-toggle" class="icon-btn" title="Fullscreen">⛶</button>
+          <button id="library-open" class="text-btn">Library</button>
+          <button id="settings-open" class="text-btn">Keys</button>
+        </nav>
+      </header>
+
+      <div id="narrator-hint" class="narrator-hint hidden">
+        <span id="hint-text"></span>
+      </div>
+
+      <footer class="bottom-bar">
+        <div class="transport">
+          <button id="prev-track" class="transport-btn" title="Previous">⏮</button>
+          <button id="auto-play" class="transport-btn play-btn" title="Play/Stop">▶</button>
+          <button id="next-track" class="transport-btn" title="Next">⏭</button>
+          <button id="narrator-toggle" class="transport-btn guide-btn" title="Guide Mode">Guide</button>
+        </div>
+
+        <div class="song-panel">
+          <div class="song-meta">
+            <span class="song-name">–</span>
+          </div>
+          <div class="scrub-row">
+            <span class="curr-time">0:00</span>
+            <input type="range" id="song-scrub" min="0" max="100" value="0">
+            <span class="total-time">0:00</span>
+          </div>
+        </div>
+
+        <div class="right-controls">
+          <div class="knob-group">
+            <label>ZOOM <span class="zoom-label">1.0×</span></label>
+            <input type="range" id="camera-zoom" min="0.4" max="3.0" step="0.05" value="1.0">
+          </div>
+          <div id="sustain-indicator" class="pill-indicator">SUSTAIN</div>
+          <div class="knob-group">
+            <label>SPEED <span class="speed-label">1.0×</span></label>
+            <input type="range" id="play-speed" min="0.5" max="2.0" step="0.1" value="1.0">
+          </div>
+          <div class="knob-group">
+            <label>VOL <span class="volume-label">80%</span></label>
+            <input type="range" id="play-volume" min="0" max="100" step="1" value="80">
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <div id="audio-modal" class="modal">
+      <div class="modal-box">
+        <p class="modal-eyebrow">Aether Studio Piano</p>
+        <h2>Ready to play</h2>
+        <p class="modal-body">Click below to start the audio engine and begin your session.</p>
+        <button id="start-audio" class="primary-btn">Start Session</button>
+      </div>
+    </div>
+
+    <div id="settings-modal" class="modal hidden">
+      <div class="modal-box wide">
+        <h2>Key Bindings</h2>
+        <p class="modal-body">Highlighted keys are mapped to notes. Use <kbd>Shift</kbd> +1 oct · <kbd>Ctrl</kbd> −1 oct · <kbd>Alt</kbd> −2 oct</p>
+        <div id="key-bindings-list"></div>
+        <div class="preferences-section" style="margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+          <h3>Preferences</h3>
+          <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-muted);">
+            <input type="checkbox" id="toggle-page-turn" style="width: 18px; height: 18px; accent-color: var(--accent);">
+            <span>Disable 3D Page Flip Animation</span>
+          </label>
+        </div>
+        <button id="settings-close-btn" class="secondary-btn">Close</button>
+      </div>
+    </div>
+
+    <div id="library-modal" class="modal hidden">
+      <div class="modal-box wide library-box">
+        <h2>Song Library</h2>
+        <div class="library-layout">
+          <div class="lib-col">
+            <h3>Composers</h3>
+            <div id="composer-grid" class="composer-grid"></div>
+          </div>
+          <div class="lib-col lib-col-songs">
+            <h3>Stored <span class="count-badge" id="local-count">0</span></h3>
+            <div id="local-song-list" class="song-list"></div>
+            <h3 style="margin-top:1.5rem">Downloaded <span class="count-badge" id="online-count">0</span></h3>
+            <div id="online-song-list" class="song-list"></div>
+          </div>
+        </div>
+        <button id="library-close-btn" class="secondary-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="debug-panel"></div>
+</body>
+</html>
