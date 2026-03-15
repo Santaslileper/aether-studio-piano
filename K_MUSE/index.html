@@ -425,10 +425,23 @@ resBox.addEventListener('click', async (e) => {
     try {
         let data;
         if (isLocal) {
-            // Map name "Rush E" -> "../songs/rush_e.js"
-            const fileName = name.toLowerCase().replace(/ – /g, '_').replace(/ /g, '_').replace(/'/g, '').replace(/[^a-z0-9_]/g, '') + '.js';
+            // Robust slug mapping for curated songs
+            const slug = name.toLowerCase()
+                .replace(/[^a-z0-9]/g, '_')
+                .replace(/_+/g, '_')
+                .replace(/^_|_$/g, '');
+            
+            // Try explicit mapping or fallback to slug
+            const fileMap = {
+                'ludwig_van_beethoven_fur_elise': 'fur_elise_full.js',
+                'ludwig_van_beethoven_moonlight_sonata': 'moonlight_sonata.js',
+                'rush_e': 'rush_e.js',
+                'runaway_aurora': 'Runaway-Aurora.js' // preserving case for FS compatibility
+            };
+            
+            const fileName = fileMap[slug] || (slug + '.js');
+            console.log("IMPORTING LOCAL:", fileName);
             const module = await import(`../songs/${fileName}`);
-            // The exported variable might have different names, but we expect it to be the only export or a standard name
             data = Object.values(module)[0]; 
         } else {
             const res = await fetch(`${apiBase}/download?path=${encodeURIComponent(path)}`);
@@ -658,14 +671,31 @@ function render() {
             VF.Beam.generateBeams(bassNotes.filter(n => n.getDuration() !== "b"))
         ];
 
-        const maxBeats = Math.max(m.length, 6);
-        new VF.Formatter().joinVoices([
-            new VF.Voice({num_beats: maxBeats, beat_value: 16}).addTickables(trebleNotes),
-            new VF.Voice({num_beats: maxBeats, beat_value: 16}).addTickables(bassNotes)
-        ]).format([topStave, bottomStave], 350);
+        const TICKS_PER_SIXTEENTH = 256; // Standard VexFlow ticks
+        const VOICE_TICKS = 6 * TICKS_PER_SIXTEENTH; // 3/8 time = 6 sixteenths
+        
+        const tVoice = new VF.Voice({num_beats: 6, beat_value: 16});
+        const bVoice = new VF.Voice({num_beats: 6, beat_value: 16});
+        
+        tVoice.addTickables(trebleNotes);
+        bVoice.addTickables(bassNotes);
 
-        trebleNotes.forEach(n => n.setContext(context).draw());
-        bassNotes.forEach(n => n.setContext(context).draw());
+        // PAD VOICES IF UNDERFLOWING (Critical fix for VexFlow crash)
+        const padVoice = (v) => {
+            let totalTicks = v.getTickables().reduce((sum, t) => sum + t.getTicks().value(), 0);
+            while (totalTicks < VOICE_TICKS) {
+                const gn = new VF.GhostNote({ duration: "16" });
+                v.addTickable(gn);
+                totalTicks += gn.getTicks().value();
+            }
+        };
+        padVoice(tVoice);
+        padVoice(bVoice);
+
+        new VF.Formatter().joinVoices([tVoice, bVoice]).format([topStave, bottomStave], 350);
+
+        tVoice.draw(context, topStave);
+        bVoice.draw(context, bottomStave);
         // (Simple beam rendering omitted for extreme stability, but voices handle alignment)
     });
 
