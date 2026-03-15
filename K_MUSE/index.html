@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>PROT:KERNEL // MUSE-CLONE STABILIZED</title>
+<script src="https://unpkg.com/vexflow@3.0.9/releases/vexflow-min.js"></script>
+<style>
+  html { scroll-behavior: smooth; }
+  body { 
+    background: #fff; 
+    margin: 0; 
+    padding: 0; 
+    overflow-x: hidden; 
+    overflow-y: scroll; /* Keep scrollbar to prevent layout shifts */
+    font-family: 'Courier New', monospace; 
+    letter-spacing: 1px; 
+    transition: background 0.8s cubic-bezier(0.4, 0, 0.2, 1); 
+  }
+
+  #ui  { mix-blend-mode: difference; color: #fff; position: fixed; top: 20px; left: 20px; z-index: 100; cursor: pointer; text-transform: uppercase; letter-spacing: 2px; font-size: 12px; padding: 5px; border: 1px solid transparent; transition: all 0.3s; }
+  #ui:hover { border-color: #fff; background: rgba(255,255,255,0.1); }
+  #log { mix-blend-mode: difference; color: #fff; position: fixed; bottom: 20px; left: 20px; z-index: 100; pointer-events: none; text-transform: uppercase; font-size: 11px; opacity: 0.7; }
+
+  /* ── ZOOM CONTROLS ── */
+  #zc {
+    position: fixed; top: 20px; right: 20px; z-index: 100;
+    display: flex; gap: 8px; align-items: center;
+  }
+  #zc button {
+    mix-blend-mode: difference;
+    background: none; border: 1px solid #fff; color: #fff;
+    font-family: 'Courier New', monospace; font-size: 11px;
+    letter-spacing: 1px; text-transform: uppercase;
+    padding: 6px 12px; cursor: pointer;
+    transition: all 0.2s;
+  }
+  #zc button:hover { background: #fff; color: #000; mix-blend-mode: normal; }
+  #zc span {
+    mix-blend-mode: difference; color: #fff;
+    font-size: 11px; letter-spacing: 1px; min-width: 45px; text-align: center;
+  }
+  #zc .divider { width: 1px; height: 16px; background: rgba(255,255,255,0.3); margin: 0 4px; }
+
+  #hdr { text-align: center; margin-top: 80px; font-family: 'Times New Roman', serif; color: #000; z-index: 50; position: relative; transition: color 0.5s; }
+  #hdr h1 { font-size: 36px; font-weight: normal; font-style: italic; margin: 0 0 4px 0; letter-spacing: -1px; }
+  #hdr h2 { font-size: 18px; font-weight: normal; margin: 0; color: #555; letter-spacing: 2px; text-transform: uppercase; }
+  #hdr .sub { position: absolute; right: 8%; top: 6px; text-align: right; font-size: 13px; line-height: 1.6; color: #444; }
+
+  #s { 
+    position: relative; 
+    width: 100%; 
+    z-index: 10; 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    margin-top: 40px; 
+    margin-bottom: 200px; 
+    gap: 0;
+    scroll-snap-type: y mandatory;
+  }
+  
+  #fx { position: fixed; top: 0; left: 0; z-index: 1; pointer-events: none; width: 100vw; height: 100vh; }
+
+  /* Page Smoothing - Refined for Pure Smoothness */
+  .vf-page {
+    width: 100%;
+    min-height: calc(100vh - 80px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 40px;
+    opacity: 0;
+    transform: translateY(100px);
+    transition: opacity 1.5s cubic-bezier(0.16, 1, 0.3, 1), 
+                transform 1.5s cubic-bezier(0.16, 1, 0.3, 1);
+    margin-bottom: 80px;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+
+  .vf-page.revealed {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .vf-measure-container {
+    background: #fff;
+    padding: 25px;
+    border-radius: 4px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.05);
+    border: 1px solid #f0f0f0;
+    transition: transform 0.4s ease, box-shadow 0.4s ease;
+    position: relative;
+    max-width: 95%;
+  }
+
+  /* Animus Mode Overrides */
+  body.animus-mode .vf-measure-container {
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(15px);
+    border-color: rgba(255,255,255,0.1);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+
+  body.animus-mode .vf-measure-container svg path,
+  body.animus-mode .vf-measure-container svg rect {
+    fill: #eee !important;
+    stroke: #eee !important;
+  }
+
+  /* ── SEARCH & INSTRUMENTS ── */
+  #controls {
+    position: fixed; top: 60px; left: 20px; z-index: 100;
+    display: flex; flex-direction: column; gap: 10px;
+    mix-blend-mode: difference;
+  }
+  .ctrl-row { display: flex; gap: 8px; align-items: center; }
+  input, select {
+    background: none; border: 1px solid #fff; color: #fff;
+    font-family: 'Courier New', monospace; font-size: 11px;
+    padding: 6px 10px; outline: none; transition: background 0.3s;
+  }
+  input:focus { background: rgba(255,255,255,0.2); }
+  #results {
+    position: absolute; top: 100%; left: 0; width: 300px;
+    background: #000; border: 1px solid #fff;
+    max-height: 400px; overflow-y: auto; z-index: 101;
+    display: none;
+  }
+  .res-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #333; }
+  .res-item:hover { background: #222; }
+  .badge { font-size: 8px; padding: 2px 4px; border: 1px solid #fff; margin-left: 5px; }
+
+  /* ── GUIDE ── */
+  #guide {
+    max-width: 800px; margin: 0 auto 100px auto; padding: 40px;
+    font-size: 12px; color: #666; line-height: 1.8;
+    background: #fcfcfc; border-top: 1px solid #eee;
+    position: relative; z-index: 10;
+  }
+  #guide h3 { font-family: 'Times New Roman', serif; font-style: italic; font-size: 20px; color: #000; margin-bottom: 15px; }
+  #guide code { background: #eee; padding: 2px 6px; border-radius: 3px; font-size: 11px; }
+  #guide pre { background: #1a1a1a; color: #ccc; padding: 20px; border-radius: 6px; overflow-x: auto; font-size: 11px; line-height: 1.7; }
+</style>
+</head>
+<body>
+
+<div id="ui" onclick="toggleAnimus()">
+  PROT:ANIMUS [TOGGLE]
+</div>
+
+<div id="controls">
+  <div class="ctrl-row">
+    <input type="text" id="sq" placeholder="SEARCH BITMIDI..." autocomplete="off">
+    <select id="is">
+        <option value="Grand Piano">GRAND PIANO</option>
+        <option value="Electric Piano 1 (Rhodes)">RHODES</option>
+        <option value="Electric Piano 2 (Wurlitzer)">WURLITZER</option>
+        <option value="Harpsichord">HARPSICHORD</option>
+        <option value="Pipe Organ">PIPE ORGAN</option>
+        <option value="String Ensemble">STRINGS</option>
+    </select>
+  </div>
+  <div id="results"></div>
+</div>
+
+<div id="log">AWAITING ENGINE...</div>
+
+<div id="zc">
+  <button onclick="changeOctave(-1)">OCT−</button>
+  <button onclick="changeOctave(1)">OCT+</button>
+  <div class="divider"></div>
+  <button onclick="prevPage()">PREV PAGE</button>
+  <button onclick="zoom(-1)">−</button>
+  <span id="zl">100%</span>
+  <button onclick="zoom(+1)">+</button>
+  <button onclick="nextPage()">NEXT PAGE</button>
+</div>
+
+<div id="hdr">
+  <h1>Für Elise in A Minor</h1>
+  <h2>Ludwig van Beethoven</h2>
+  <div class="sub">WoO 59<br>(1770–1827)<br>STABILIZED KERNEL v2.1</div>
+</div>
+
+<div id="s"></div>
+<canvas id="fx"></canvas>
+
+<div id="guide">
+  <h3>Protocol: Data Integration</h3>
+  <p>The kernel expects a JSON array of note objects. High-frequency updates are stabilized via the Muse-Clone rendering pipeline.</p>
+  <pre>
+[
+  { "type": "note", "note": "E5", "time": 0.738, "duration": 0.22 },
+  { "type": "note", "note": "D#5", "time": 0.933, "duration": 0.20 }
+]
+  </pre>
+  <p>Notes within <code>0.05s</code> delta are clustered into chords. Octaves 4+ default to G-Clef; Octaves 3- default to F-Clef.</p>
+</div>
+
+<script type="module">
+import * as Tone from 'https://esm.sh/tone@15.1.22';
+import { CURATED_SONGS } from '../js/constants.js';
+
+let currentSong = null;
+let currentBuffer = [];
+// ─── PROT:AUDIO ────────────────────────────────────────────────────────────
+let audioStarted = false;
+let currentSampler = null;
+const SAL_BASE = 'https://tonejs.github.io/audio/salamander/';
+const SAL_URLS = { A0:'A0.mp3',C1:'C1.mp3','D#1':'Ds1.mp3','F#1':'Fs1.mp3',A1:'A1.mp3',C2:'C2.mp3','D#2':'Ds2.mp3','F#2':'Fs2.mp3',A2:'A2.mp3',C3:'C3.mp3','D#3':'Ds3.mp3','F#3':'Fs3.mp3',A3:'A3.mp3',C4:'C4.mp3','D#4':'Ds4.mp3','F#4':'Fs4.mp3',A4:'A4.mp3',C5:'C5.mp3','D#5':'Ds5.mp3','F#5':'Fs5.mp3',A5:'A5.mp3',C6:'C6.mp3','D#6':'Ds6.mp3','F#6':'Fs6.mp3',A6:'A6.mp3',C7:'C7.mp3','D#7':'Ds7.mp3','F#7':'Fs7.mp3',A7:'A7.mp3',C8:'C8.mp3' };
+
+async function startAudio() {
+    if (audioStarted) return;
+    await Tone.start();
+    audioStarted = true;
+    log("AUDIO STABILIZED");
+    loadInstrument(document.getElementById('is').value);
+}
+
+const INSTRUMENTS = {
+    'Grand Piano': () => new Tone.Sampler({ urls: SAL_URLS, baseUrl: SAL_BASE }).toDestination(),
+    'Electric Piano 1 (Rhodes)': () => new Tone.PolySynth(Tone.FMSynth, { harmonicity: 3.01, modulationIndex: 14, oscillator: { type: 'triangle' }, envelope: { attack: 0.2, decay: 0.3, sustain: 0.1, release: 1.2 } }).toDestination(),
+    'Electric Piano 2 (Wurlitzer)': () => new Tone.PolySynth(Tone.AMSynth, { harmonicity: 1.5, oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0.3, release: 0.8 } }).toDestination(),
+    'Harpsichord': () => new Tone.PolySynth(Tone.PluckSynth, { attackNoise: 3, dampening: 5000, resonance: 0.6 }).toDestination(),
+    'Pipe Organ': () => new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'square' }, envelope: { attack: 0.02, decay: 0, sustain: 1, release: 0.08 } }).toDestination(),
+    'String Ensemble': () => {
+        const c = new Tone.Chorus(4, 2.5, 0.5).toDestination().start();
+        return new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'sawtooth' }, envelope: { attack: 0.4, decay: 0, sustain: 1, release: 0.8 } }).connect(c);
+    }
+};
+
+function loadInstrument(name) {
+    if (currentSampler) currentSampler.dispose();
+    currentSampler = INSTRUMENTS[name]();
+    log(`LOADED: ${name.toUpperCase()}`);
+}
+
+document.getElementById('is').addEventListener('change', (e) => loadInstrument(e.target.value));
+document.body.addEventListener('mousedown', startAudio, { once: true });
+document.body.addEventListener('keydown', startAudio, { once: true });
+
+// ─── PROT:VISUAL ───────────────────────────────────────────────────────────
+const VF = Vex.Flow;
+const BPM = 80;
+const SEC_PER_QUARTER = 60 / BPM;
+const MEASURE_DURATION = SEC_PER_QUARTER * 1.5; // 3/8 time
+
+window.measures = [];
+window.octaveShift = 0;
+
+// ─── PROT:DATA ─────────────────────────────────────────────────────────────
+const container = document.getElementById('s');
+const logEl = document.getElementById('log');
+
+function clusterNotes(rawData) {
+    const rawNotes = rawData.filter(e => e.type === 'note');
+    if (!rawNotes.length) return [];
+    
+    rawNotes.sort((a, b) => a.time - b.time);
+    const slots = [];
+    rawNotes.forEach(n => {
+        let slot = slots.find(s => Math.abs(s.time - n.time) < 0.05);
+        if (slot) slot.notes.push(n);
+        else slots.push({ time: n.time, notes: [n] });
+    });
+
+    const measures = [];
+    let currentMeasure = [];
+    let measureStartTime = slots[0]?.time || 0;
+
+    slots.forEach(slot => {
+        while (slot.time >= measureStartTime + MEASURE_DURATION) {
+            measures.push(currentMeasure);
+            currentMeasure = [];
+            measureStartTime += MEASURE_DURATION;
+        }
+        currentMeasure.push(slot);
+    });
+    if (currentMeasure.length > 0) measures.push(currentMeasure);
+    return measures;
+}
+
+function log(msg) { logEl.innerText = msg; }
+
+// ─── ZOOM ─────────────────────────────────────────────────────────────
+window.zoomScale = 1.0;
+window.zoom = function(dir) {
+    window.zoomScale += dir * 0.1;
+    window.zoomScale = Math.max(0.4, Math.min(2.5, window.zoomScale));
+    document.getElementById('zl').innerText = Math.round(window.zoomScale * 100) + "%";
+    render();
+};
+
+window.changeOctave = function(dir) {
+    window.octaveShift += dir;
+    log("OCTAVE SHIFT: " + (window.octaveShift >= 0 ? "+" : "") + window.octaveShift);
+    render();
+};
+
+// ─── ANIMUS (FX) ─────────────────────────────────────────────────────────────
+let animusActive = false;
+const canvas = document.getElementById('fx');
+const ctx = canvas.getContext('2d');
+let particles = [];
+
+window.toggleAnimus = function() {
+    animusActive = !animusActive;
+    if (animusActive) {
+        document.body.classList.add('animus-mode');
+        document.body.style.background = "#050508";
+        document.getElementById('hdr').style.color = "#fff";
+        document.getElementById('hdr').querySelector('h2').style.color = "#888";
+        document.getElementById('hdr').querySelector('.sub').style.color = "#666";
+        startAnimus();
+    } else {
+        document.body.classList.remove('animus-mode');
+        document.body.style.background = "#fff";
+        document.getElementById('hdr').style.color = "#000";
+        document.getElementById('hdr').querySelector('h2').style.color = "#555";
+        document.getElementById('hdr').querySelector('.sub').style.color = "#444";
+    }
+};
+
+function startAnimus() {
+    resizeCanvas();
+    if (particles.length === 0) {
+        for (let i = 0; i < 80; i++) particles.push(new Particle());
+    }
+    animate();
+}
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+
+class Particle {
+    constructor() { this.reset(); }
+    reset() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.size = Math.random() * 2 + 0.5;
+        this.vx = (Math.random() - 0.5) * 0.4;
+        this.vy = (Math.random() - 0.5) * 0.4;
+        this.life = Math.random() * 0.5 + 0.2;
+    }
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        if (this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) this.reset();
+    }
+    draw() {
+        ctx.fillStyle = `rgba(200, 200, 255, ${this.life})`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+function animate() {
+    if (!animusActive) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+    }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles.forEach(p => { p.update(); p.draw(); });
+    requestAnimationFrame(animate);
+}
+
+// ─── SEARCH ─────────────────────────────────────────────────────────────
+const apiBase = location.protocol === 'http:' ? 'http://127.0.0.1:3001' : '';
+const sq = document.getElementById('sq');
+const resBox = document.getElementById('results');
+
+sq.addEventListener('input', async () => {
+    const q = sq.value.trim().toLowerCase();
+    if (q.length < 2) { resBox.style.display = 'none'; return; }
+    
+    // Local Filter
+    const local = CURATED_SONGS.filter(s => s.toLowerCase().includes(q));
+    let html = local.map(s => `<div class="res-item local" data-local="true" data-name="${s}">${s} <span class="badge" style="background:#52a878;color:#fff">LOCAL</span></div>`).join('');
+
+    try {
+        const res = await fetch(`${apiBase}/search?q=${encodeURIComponent(q)}`);
+        const online = await res.json();
+        html += online.map(r => `<div class="res-item" data-path="${r.path}" data-name="${r.name}">${r.name} <span class="badge">BITMIDI</span></div>`).join('');
+    } catch (_) { 
+        if (!html) log("SERVER OFFLINE"); 
+    }
+    
+    resBox.innerHTML = html;
+    resBox.style.display = 'block';
+});
+
+resBox.addEventListener('click', async (e) => {
+    const item = e.target.closest('.res-item');
+    if (!item) return;
+    const name = item.dataset.name;
+    const path = item.dataset.path;
+    const isLocal = item.dataset.local === 'true';
+
+    resBox.style.display = 'none';
+    sq.value = '';
+    log("LOADING: " + name);
+
+    try {
+        let data;
+        if (isLocal) {
+            // Map name "Rush E" -> "../songs/rush_e.js"
+            const fileName = name.toLowerCase().replace(/ – /g, '_').replace(/ /g, '_').replace(/'/g, '').replace(/[^a-z0-9_]/g, '') + '.js';
+            const module = await import(`../songs/${fileName}`);
+            // The exported variable might have different names, but we expect it to be the only export or a standard name
+            data = Object.values(module)[0]; 
+        } else {
+            const res = await fetch(`${apiBase}/download?path=${encodeURIComponent(path)}`);
+            data = await res.json();
+        }
+        
+        if (!data || !data.length) throw new Error("EMPTY DATA");
+        
+        // Update header
+        const parts = name.split(' – ');
+        document.getElementById('hdr').querySelector('h1').innerText = parts[1] || parts[0];
+        document.getElementById('hdr').querySelector('h2').innerText = parts[0] || "Unknown";
+        
+        window.measures = clusterNotes(data);
+        window.currentPage = 0;
+        render();
+        log("ENGINE STABILIZED // " + name);
+    } catch (err) {
+        log("LOAD FAILED: " + err.message);
+    }
+});
+
+document.addEventListener('click', (e) => { if (!sq.contains(e.target)) resBox.style.display = 'none'; });
+
+// ─── PAGING ─────────────────────────────────────────────────────────────
+window.currentPage = 0;
+window.nextPage = function() {
+    const pages = document.querySelectorAll('.vf-page');
+    if (window.currentPage < pages.length - 1) {
+        window.currentPage++;
+        pages[window.currentPage].scrollIntoView({ behavior: 'smooth' });
+    }
+};
+window.prevPage = function() {
+    const pages = document.querySelectorAll('.vf-page');
+    if (window.currentPage > 0) {
+        window.currentPage--;
+        pages[window.currentPage].scrollIntoView({ behavior: 'smooth' });
+    }
+};
+
+// Sync state on manual scroll
+window.addEventListener('scroll', () => {
+    const pages = document.querySelectorAll('.vf-page');
+    pages.forEach((page, idx) => {
+        const rect = page.getBoundingClientRect();
+        if (rect.top >= 0 && rect.top < window.innerHeight / 2) {
+            window.currentPage = idx;
+        }
+    });
+});
+
+// Keyboard shortcuts
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') window.nextPage();
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') window.prevPage();
+});
+
+// ─── RENDER ENGINE ─────────────────────────────────────────────────────────────
+function render() {
+    container.innerHTML = '';
+    if (!window.measures || !window.measures.length) {
+        log("AWAITING DATA...");
+        return;
+    }
+    log("PROT:RENDERING...");
+
+    const maxMeasures = 60; // Show up to 60 measures
+    const measures = window.measures.slice(0, maxMeasures);
+
+    // 3. VexFlow Execution with Page Grouping
+    const MEASURES_PER_PAGE = 4;
+    let pageEl = null;
+
+    // Intersection Observer for smooth reveal
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('revealed');
+            }
+        });
+    }, { threshold: 0.1 });
+
+    measures.forEach((m, idx) => {
+        // Create new page every N measures
+        if (idx % MEASURES_PER_PAGE === 0) {
+            pageEl = document.createElement('div');
+            pageEl.className = 'vf-page';
+            container.appendChild(pageEl);
+            observer.observe(pageEl);
+        }
+
+        const wrap = document.createElement('div');
+        wrap.className = 'vf-measure-container';
+        pageEl.appendChild(wrap);
+
+        const renderer = new VF.Renderer(wrap, VF.Renderer.Backends.SVG);
+        const w = 450 * window.zoomScale;
+        const h = 260 * window.zoomScale;
+        renderer.resize(w, h);
+        const context = renderer.getContext();
+        context.scale(window.zoomScale, window.zoomScale);
+
+        const topStave = new VF.Stave(10, 40, 400);
+        const bottomStave = new VF.Stave(10, 130, 400);
+        
+        if (idx === 0) {
+            topStave.addClef("treble").addTimeSignature("3/8");
+            bottomStave.addClef("bass").addTimeSignature("3/8");
+        }
+        
+        topStave.setContext(context).draw();
+        bottomStave.setContext(context).draw();
+
+        new VF.StaveConnector(topStave, bottomStave).setType(VF.StaveConnector.type.BRACE).setContext(context).draw();
+        new VF.StaveConnector(topStave, bottomStave).setType(VF.StaveConnector.type.SINGLE_LEFT).setContext(context).draw();
+
+        let trebleNotes = [];
+        let bassNotes = [];
+
+        m.forEach(slot => {
+            const shiftNote = (n) => {
+                const parts = n.note.match(/^([A-G]#?)(\d)$/);
+                if (!parts) return n.note;
+                const newOct = parseInt(parts[2]) + window.octaveShift;
+                return parts[1] + newOct;
+            };
+
+            const up = slot.notes.filter(n => {
+                const sn = shiftNote(n);
+                return parseInt(sn.slice(-1)) >= 4;
+            });
+            const down = slot.notes.filter(n => {
+                const sn = shiftNote(n);
+                return parseInt(sn.slice(-1)) < 4;
+            });
+
+            if (up.length > 0) {
+                const sn = new VF.StaveNote({
+                    clef: "treble", 
+                    keys: up.map(n => {
+                        const note = shiftNote(n);
+                        return note.replace('#', '#/').toLowerCase() + (note.includes('#') ? '' : '/');
+                    }),
+                    duration: "16"
+                });
+                up.forEach((n, i) => { if (n.note.includes('#')) sn.addAccidental(i, new VF.Accidental("#")); });
+                trebleNotes.push(sn);
+            } else {
+                trebleNotes.push(new VF.GhostNote({ duration: "16" }));
+            }
+
+            if (down.length > 0) {
+                const sn = new VF.StaveNote({
+                    clef: "bass", 
+                    keys: down.map(n => {
+                        const note = shiftNote(n);
+                        return note.replace('#', '#/').toLowerCase() + (note.includes('#') ? '' : '/');
+                    }),
+                    duration: "16"
+                });
+                down.forEach((n, i) => { if (n.note.includes('#')) sn.addAccidental(i, new VF.Accidental("#")); });
+                bassNotes.push(sn);
+            } else {
+                bassNotes.push(new VF.GhostNote({ duration: "16" }));
+            }
+        });
+
+        // Beam notes if possible
+        const beams = [
+            VF.Beam.generateBeams(trebleNotes.filter(n => n.getDuration() !== "b")), // skip ghosts for beams
+            VF.Beam.generateBeams(bassNotes.filter(n => n.getDuration() !== "b"))
+        ];
+
+        new VF.Formatter().joinVoices([
+            new VF.Voice({num_beats: 6, beat_value: 16}).addTickables(trebleNotes),
+            new VF.Voice({num_beats: 6, beat_value: 16}).addTickables(bassNotes)
+        ]).format([topStave, bottomStave], 350);
+
+        trebleNotes.forEach(n => n.setContext(context).draw());
+        bassNotes.forEach(n => n.setContext(context).draw());
+        // (Simple beam rendering omitted for extreme stability, but voices handle alignment)
+    });
+
+    log("KERNEL STABILIZED // " + measures.length + " MEASURES ACTIVE");
+}
+
+render();
+</script>
+</body>
+</html>
