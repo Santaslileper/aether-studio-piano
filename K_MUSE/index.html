@@ -427,19 +427,23 @@ resBox.addEventListener('click', async (e) => {
         if (isLocal) {
             // Robust slug mapping for curated songs
             const slug = name.toLowerCase()
-                .replace(/[^a-z0-9]/g, '_')
+                .replace(/ – /g, '___')
+                .replace(/ – /g, '___') // Just in case of variations
+                .replace(/ /g, '_')
+                .replace(/[^a-z0-9_]/g, '')
                 .replace(/_+/g, '_')
                 .replace(/^_|_$/g, '');
             
             // Try explicit mapping or fallback to slug
             const fileMap = {
-                'ludwig_van_beethoven_fur_elise': 'fur_elise_full.js',
-                'ludwig_van_beethoven_moonlight_sonata': 'moonlight_sonata.js'
+                'ludwig_van_beethoven___f_r_elise': 'ludwig_van_beethoven___f_r_elise.js',
+                'ludwig_van_beethoven___moonlight_sonata': 'ludwig_van_beethoven___moonlight_sonata.js',
+                'the_muffin_man': 'the_muffin_man.js'
             };
             
             const fileName = fileMap[slug] || (slug + '.js');
             console.log("IMPORTING LOCAL:", fileName);
-            const module = await import(`../songs/${fileName}`);
+            const module = await import(`../assets/${fileName}`);
             data = Object.values(module)[0]; 
         } else {
             const res = await fetch(`${apiBase}/download?path=${encodeURIComponent(path)}`);

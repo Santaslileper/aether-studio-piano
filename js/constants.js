@@ -72,6 +72,7 @@ export const CURATED_SONGS = [
     'Franz Schubert – Impromptu Op. 90 No. 3',
     'Johannes Brahms – Intermezzo Op. 118 No. 2',
     'Camille Saint-Saëns – The Swan',
+    'The Muffin Man',
 ];
 
 export const COMPOSERS = [
