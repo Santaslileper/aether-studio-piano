@@ -26,7 +26,7 @@ export function setupUI(handlers) {
         let html = local.map(([k, s]) => `<div class="search-item local" data-key="${k}"><span>${s.name}</span><span class="badge local">Local</span></div>`).join('');
 
         const curated = CURATED_SONGS.filter(s => s.toLowerCase().includes(term.toLowerCase())).slice(0, 5);
-        html += curated.map(s => `<div class="search-item curated" data-name="${s}">${s} <span class="badge">Search</span></div>`).join('');
+        html += curated.map(s => `<div class="search-item curated local" data-key="${s}"><span>${s}</span><span class="badge">Library</span></div>`).join('');
         
         if (html) { 
             searchResults.innerHTML = html; 
@@ -95,7 +95,7 @@ export function setupUI(handlers) {
             searchInput.value=''; 
             return; 
         }
-        if (item.dataset.name && item.classList.contains('curated')) {
+        if (item.dataset.name && item.classList.contains('curated') && !item.dataset.key) {
             searchInput.value = item.dataset.name;
             searchInput.dispatchEvent(new Event('input'));
             return;

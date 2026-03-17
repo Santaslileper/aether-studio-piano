@@ -179,12 +179,21 @@ export function updateSongDisplay() {
     updateSongDisplayUI(song);
     lsSet('last_song', state.currentSongKey);
     state.currentSpread = 0;
-    updateSheetMusic(song.data);
+    if (song.data) updateSheetMusic(song.data);
 }
 
-export function selectSong(key) {
+export async function selectSong(key) {
     stopAutoplay(); stopNarrator();
     state.currentSongKey = key;
+    
+    const song = state.playlists[key];
+    if (song && !song.data && song.fileName) {
+        try {
+            const module = await import(`../assets/${song.fileName}`);
+            song.data = Object.values(module)[0];
+        } catch (e) { console.error("Failed to load song data", e); }
+    }
+
     updateSongDisplay();
     document.getElementById('library-modal')?.classList.add('hidden');
     setTimeout(() => startAutoplay(), 80);
