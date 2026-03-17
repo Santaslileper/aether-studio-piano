@@ -35,11 +35,11 @@ async function init() {
     setupUI(handlers);
 
     // 3. Populate Library with Curated Songs
-    // We attempt to load all songs in CURATED_SONGS into the initial state
     for (const songName of CURATED_SONGS) {
         const key = songName;
         // Map song name to potential filename
         const slug = songName.toLowerCase()
+                .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove accents (ü -> u)
                 .replace(/ – /g, '___')
                 .replace(/ - /g, '___')
                 .replace(/ /g, '_')
@@ -48,17 +48,17 @@ async function init() {
                 .replace(/^_|_$/g, '');
         
         const fileMap = {
-            'ludwig_van_beethoven___f_r_elise': 'ludwig_van_beethoven___f_r_elise.js',
+            'ludwig_van_beethoven___fur_elise': 'ludwig_van_beethoven___f_r_elise.js',
             'ludwig_van_beethoven___moonlight_sonata': 'ludwig_van_beethoven___moonlight_sonata.js',
             'the_muffin_man': 'the_muffin_man.js'
         };
         const fileName = fileMap[slug] || (slug + '.js');
         
-        // Mark as a "Local Library" song
         state.playlists[key] = { 
             name: songName, 
             fileName: fileName,
-            data: null // Loaded on demand
+            isLocal: true,
+            data: null
         };
     }
 

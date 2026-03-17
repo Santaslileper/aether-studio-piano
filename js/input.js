@@ -57,10 +57,12 @@ export function setupInput() {
         const ks = e.key?.toLowerCase() || '';
 
         if (ks === '`') { 
+            console.log('Toggling Debug Panel');
             const dbg = document.getElementById('debug-panel');
             if (dbg) dbg.style.display = dbg.style.display === 'none' ? 'block' : 'none'; 
             return; 
         }
+        console.log('Keydown:', ks, 'Midi:', keyMap[ks]);
         if (e.key === 'ArrowRight') { switchSong(1); return; }
         if (e.key === 'ArrowLeft')  { switchSong(-1); return; }
         if (e.key === '=' || e.key === '+') { 

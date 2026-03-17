@@ -151,15 +151,42 @@ export function setupUI(handlers) {
     });
 
     // Library
-    const libraryModal = document.getElementById('library-modal');
-    document.getElementById('library-open').addEventListener('click', () => { updateLibraryUI(); libraryModal.classList.remove('hidden'); });
-    document.getElementById('library-close-btn').addEventListener('click', () => libraryModal.classList.add('hidden'));
+    // Library Modal Search & Filters
+    const libSearchInput = document.getElementById('library-search');
+    const filterBtns = document.querySelectorAll('.filter-btn');
+    
+    libSearchInput?.addEventListener('input', () => updateLibraryUI());
+    
+    filterBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            filterBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            updateLibraryUI();
+        });
+    });
+
+    document.getElementById('library-open').addEventListener('click', () => { 
+        updateLibraryUI(); 
+        libraryModal.classList.remove('hidden'); 
+    });
+    
+    const closeBtn = document.getElementById('library-close-btn') || document.getElementById('library-close');
+    closeBtn?.addEventListener('click', () => libraryModal.classList.add('hidden'));
 
     document.addEventListener('click', e => {
         const chip = e.target.closest('.composer-chip');
         const btn = e.target.closest('.lib-btn');
         const item = e.target.closest('.library-item');
-        if (chip) { searchInput.value = chip.dataset.name; searchInput.dispatchEvent(new Event('input')); libraryModal.classList.add('hidden'); }
+        if (chip) { 
+            if (libSearchInput) {
+                libSearchInput.value = chip.dataset.name;
+                updateLibraryUI();
+            } else {
+                searchInput.value = chip.dataset.name; 
+                searchInput.dispatchEvent(new Event('input')); 
+                libraryModal.classList.add('hidden'); 
+            }
+        }
         if (btn && item) {
             const key = item.dataset.key;
             if (btn.classList.contains('play')) { selectSong(key); }
@@ -366,37 +393,70 @@ export function setupUI(handlers) {
 }
 
 export function updateLibraryUI() {
-    const isSong = (name) => {
-        const n = name.toLowerCase();
-        return !n.includes('random midi') && !n.includes('privacy') && !n.includes('about bitmidi') && !n.includes('terms') && !n.includes('contact');
-    };
+    const searchVal = document.getElementById('library-search')?.value.toLowerCase() || '';
+    const activeFilter = document.querySelector('.filter-btn.active')?.dataset.filter || 'all';
+    const songsList = document.getElementById('library-songs-list');
+    const compList = document.getElementById('composer-list');
 
-    const local = Object.entries(state.playlists).filter(([k, s]) => !k.startsWith('ONLINE_') && !s?.isRecording && isSong(s.name));
-    const online = Object.entries(state.playlists).filter(([k, s]) => k.startsWith('ONLINE_') && isSong(s.name));
-    const localCount = document.getElementById('local-count');
-    const onlineCount = document.getElementById('online-count');
-    if (localCount) localCount.textContent = local.length;
-    if (onlineCount) onlineCount.textContent = online.length;
+    // 1. Filter Songs
+    const allSongs = Object.entries(state.playlists);
+    const filteredSongs = allSongs.filter(([k, s]) => {
+        // Basic Metadata Filter
+        const matchesSearch = s.name.toLowerCase().includes(searchVal);
+        const isOnline = k.startsWith('ONLINE_');
+        const isLocal = s.isLocal;
+        const isRecording = s.isRecording;
 
-    const compGrid = document.getElementById('composer-grid');
-    if (compGrid) compGrid.innerHTML = COMPOSERS.map(c => `<button class="composer-chip" data-name="${c}">${c}</button>`).join('');
+        if (!matchesSearch) return false;
 
-    const renderList = (entries) => entries.map(([k, s]) => `
-        <div class="library-item" data-key="${k}">
-            <div class="info">
-                <h4>${s.name} ${s.isRecording ? '<span class="badge" style="background:var(--accent); color:#000; font-size:0.6rem; padding:1px 4px; border-radius:3px; vertical-align:middle; margin-left:5px">NEW</span>' : ''}</h4>
-                <p>${s.data?.length || 0} events</p>
-            </div>
-            <div class="lib-actions">
-                <button class="lib-btn play">▶ Play</button>
-                ${(k.startsWith('ONLINE_') || k.startsWith('REC_')) ? `<button class="lib-btn del">Delete</button>` : ''}
-            </div>
-        </div>`).join('');
+        // Type Filter
+        if (activeFilter === 'local') return isLocal;
+        if (activeFilter === 'downloaded') return isOnline || isRecording;
+        
+        return true;
+    });
 
-    const localList = document.getElementById('local-song-list');
+    // 2. Render Songs Grid
+    if (songsList) {
+        if (filteredSongs.length === 0) {
+            songsList.innerHTML = `<div class="empty-state">No songs found for "${searchVal}"</div>`;
+        } else {
+            songsList.innerHTML = filteredSongs.map(([k, s]) => `
+                <div class="library-item ${state.currentSongKey === k ? 'active' : ''}" data-key="${k}">
+                    <div class="item-visual">
+                        <span class="icon">${s.isLocal ? '🏛️' : s.isRecording ? '⏺️' : '☁️'}</span>
+                    </div>
+                    <div class="item-info">
+                        <h4>${s.name}</h4>
+                        <p>${s.isLocal ? 'Aether Library' : s.isRecording ? 'Your Recording' : 'Downloaded'}</p>
+                    </div>
+                    <div class="item-actions">
+                        <button class="lib-btn play" title="Play Now">▶</button>
+                        ${(!s.isLocal) ? `<button class="lib-btn del" title="Delete">✕</button>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+    }
+
+    // 3. Render Composers
+    if (compList) {
+        compList.innerHTML = COMPOSERS.map(c => `
+            <button class="composer-chip ${searchVal.includes(c.toLowerCase()) ? 'active' : ''}" data-name="${c}">${c}</button>
+        `).join('');
+    }
+
+    // 4. Update Online Results in sidebar (if element exists)
     const onlineList = document.getElementById('online-song-list');
-    if (localList) localList.innerHTML = renderList(local);
-    if (onlineList) onlineList.innerHTML = renderList(online);
+    if (onlineList) {
+        const downloaded = allSongs.filter(([k]) => k.startsWith('ONLINE_'));
+        onlineList.innerHTML = downloaded.map(([k, s]) => `
+             <div class="library-item mini" data-key="${k}">
+                <span>${s.name}</span>
+                <button class="lib-btn play">▶</button>
+             </div>
+        `).join('');
+    }
 }
 
 export function updateSongDisplayUI(song) {
