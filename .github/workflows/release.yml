@@ -1,0 +1,20 @@
+name: Package Agent Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Zip agent
+        run: |
+          cd agent
+          zip -r ../aether-agent.zip . -x "*/__pycache__/*" "*.pyc"
+      - uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            aether-agent.zip
+            install.ps1

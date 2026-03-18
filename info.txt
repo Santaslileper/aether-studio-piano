@@ -1,0 +1,5 @@
+the idea is to have it hosted on git hub pages witrh a install cvoppyt sript for power shell that will install the agent side of things and have the defalts and the html ct goten from pages
+so you can use the client to get and seamlesly download more midises ect
+perhaps compiled
+
+irm https://raw.githubusercontent.com/YOUR_USERNAME/aurum-studio/main/install.ps1 | iex

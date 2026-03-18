@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>PROT:KERNEL // MUSE-CLONE STABILIZED</title>
+<script src="https://unpkg.com/vexflow@3.0.9/releases/vexflow-min.js"></script>
+<style>
+  body { background: #fff; margin: 0; padding: 0; overflow-x: hidden; overflow-y: auto; font-family: 'Courier New', monospace; letter-spacing: 1px; }
+
+  #ui  { mix-blend-mode: difference; color: #fff; position: fixed; top: 20px; left: 20px; z-index: 10; cursor: pointer; text-transform: uppercase; letter-spacing: 2px; font-size: 12px; }
+  #log { mix-blend-mode: difference; color: #fff; position: fixed; bottom: 20px; left: 20px; z-index: 10; pointer-events: none; text-transform: uppercase; font-size: 11px; }
+
+  #zc {
+    position: fixed; top: 20px; right: 20px; z-index: 10;
+    display: flex; gap: 12px; align-items: center;
+  }
+  #zc button {
+    mix-blend-mode: difference;
+    background: none; border: 1px solid #fff; color: #fff;
+    font-family: 'Courier New', monospace; font-size: 11px;
+    letter-spacing: 1px; text-transform: uppercase;
+    padding: 6px 14px; cursor: pointer;
+    transition: all 0.2s;
+  }
+  #zc button:hover { background: rgba(255,255,255,0.2); }
+  #zc button.active { background: #fff; color: #000; mix-blend-mode: normal; }
+
+  #zc span {
+    mix-blend-mode: difference; color: #fff;
+    font-size: 11px; letter-spacing: 1px; min-width: 36px; text-align: center;
+  }
+
+  #hdr { text-align: center; margin-top: 70px; font-family: 'Times New Roman', serif; color: #000; z-index: 5; position: relative; }
+  #hdr h1 { font-size: 30px; font-weight: normal; font-style: italic; margin: 0 0 4px 0; }
+  #hdr h2 { font-size: 17px; font-weight: normal; margin: 0; color: #444; }
+  #hdr .sub { position: absolute; right: 8%; top: 6px; text-align: right; font-size: 13px; line-height: 1.5; color: #333; }
+
+  #s { position: relative; top: 0; left: 0; width: 100%; z-index: 5; display: flex; justify-content: center; margin-top: 20px; margin-bottom: 60px; }
+  #fx { position: fixed; top: 0; left: 0; z-index: 1; pointer-events: none; }
+  body.in-iframe #ui, body.in-iframe #zc { display: none !important; }
+  body.in-iframe #hdr { margin-top: 30px; }
+</style>
+</head>
+<body class="in-iframe">
+
+<div id="ui" onclick="document.body.style.background=document.body.style.background==='rgb(255, 255, 255)'||document.body.style.background===''?'#aaa':'#fff'">
+  PROT:ANIMUS [TOGGLE]
+</div>
+
+<div id="log">AWAITING RENDER...</div>
+
+<div id="zc">
+  <button id="p-btn" onclick="togglePlay()">LOADING AUDIO...</button>
+  <button onclick="zoom(-1)">− ZOOM</button>
+  <span id="zl">100%</span>
+  <button onclick="zoom(+1)">+ ZOOM</button>
+  <button id="scroll-btn" onclick="toggleAutoScroll()" class="active">↕ SCROLL</button>
+</div>
+
+<div style="display:flex;align-items:center;gap:4px;padding:6px 20px 0;font-family:'Courier New',monospace;font-size:10px;color:#666;border-top:1px solid rgba(0,0,0,0.07);">
+  <span style="letter-spacing:1px;opacity:0.5;min-width:24px;">EQ</span>
+  <div style="display:flex;flex:1;gap:12px;align-items:center;">
+    <div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:2px;">
+      <label style="font-size:9px;letter-spacing:1px;opacity:0.5;">BASS</label>
+      <input type="range" min="0" max="100" value="50" style="width:100%;height:2px;cursor:pointer;" oninput="setEQ('low',this.value)">
+      <span id="eq-val-low" style="font-size:9px;opacity:0.4;">0dB</span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:2px;">
+      <label style="font-size:9px;letter-spacing:1px;opacity:0.5;">MID</label>
+      <input type="range" min="0" max="100" value="50" style="width:100%;height:2px;cursor:pointer;" oninput="setEQ('mid',this.value)">
+      <span id="eq-val-mid" style="font-size:9px;opacity:0.4;">0dB</span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:2px;">
+      <label style="font-size:9px;letter-spacing:1px;opacity:0.5;">TREBLE</label>
+      <input type="range" min="0" max="100" value="50" style="width:100%;height:2px;cursor:pointer;" oninput="setEQ('high',this.value)">
+      <span id="eq-val-high" style="font-size:9px;opacity:0.4;">0dB</span>
+    </div>
+  </div>
+</div>
+
+<div id="hdr">
+  <h1 id="title">Für Elise in A Minor</h1>
+  <h2 id="composer_info">WoO 59</h2>
+  <div class="sub" id="composer_sub">Ludwig van Beethoven<br>(1770–1827)</div>
+</div>
+
+<div id="s"></div>
+<canvas id="fx"></canvas>
+
+<!-- Playback progress bar -->
+<div id="prog-track" style="position:fixed;bottom:0;left:0;width:100%;height:3px;background:rgba(0,0,0,0.12);z-index:20;">
+  <div id="prog-bar" style="height:100%;width:0%;background:#d4af37;transition:width 0.3s linear;"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+<script>
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let sampler = null;
+let isPlaying = false;
+let audioReady = false;
+let isLoading = false;
+let playOnLoad = false;
+let autoScrollEnabled = true;
+const eq3 = new Tone.EQ3({ low: 0, mid: 0, high: 0, lowFrequency: 250, highFrequency: 3500 }).toDestination();
+
+// timeMap: "1.234" -> [ {el: SVGElement, origFill: string}, ... ]
+// Built fresh each time gS() renders. Keyed by n.time.toFixed(3).
+let timeMap = {};
+
+const GOLD = '#d4af37';
+const SAL_URLS = { A0:"A0.mp3",C1:"C1.mp3","D#1":"Ds1.mp3","F#1":"Fs1.mp3",A1:"A1.mp3",C2:"C2.mp3","D#2":"Ds2.mp3","F#2":"Fs2.mp3",A2:"A2.mp3",C3:"C3.mp3","D#3":"Ds3.mp3","F#3":"Fs3.mp3",A3:"A3.mp3",C4:"C4.mp3","D#4":"Ds4.mp3","F#4":"Fs4.mp3",A4:"A4.mp3",C5:"C5.mp3","D#5":"Ds5.mp3","F#5":"Fs5.mp3",A5:"A5.mp3",C6:"C6.mp3","D#6":"Ds6.mp3","F#6":"Fs6.mp3",A6:"A6.mp3",C7:"C7.mp3","D#7":"Ds7.mp3","F#7":"Fs7.mp3",A7:"A7.mp3",C8:"C8.mp3" };
+
+// ─── AUDIO ────────────────────────────────────────────────────────────────────
+async function initAudio() {
+    if (audioReady || isLoading) return;
+    isLoading = true;
+    const timeout = setTimeout(() => {
+        if (!audioReady) {
+            sampler = new Tone.PolySynth(Tone.Synth);
+            sampler.connect(eq3);
+            audioReady = true; isLoading = false;
+            if (playOnLoad) togglePlay();
+        }
+    }, 15000);
+    try {
+        await Tone.start();
+        sampler = new Tone.Sampler({
+            urls: SAL_URLS,
+            baseUrl: "https://tonejs.github.io/audio/salamander/",
+            onload: () => {
+                clearTimeout(timeout);
+                audioReady = true; isLoading = false;
+                if (playOnLoad) togglePlay();
+            }
+        });
+        sampler.connect(eq3);
+    } catch (e) { isLoading = false; }
+}
+
+function togglePlay() {
+    if (!audioReady) { playOnLoad = true; initAudio(); return; }
+    if (!isPlaying) {
+        isPlaying = true; playOnLoad = false;
+        playNotes();
+        startProgressBar();
+    } else {
+        isPlaying = false; playOnLoad = false;
+        Tone.Transport.stop(); Tone.Transport.cancel();
+        stopProgressBar();
+    }
+}
+
+let _progInterval = null;
+let _progMaxT = 0;
+
+function startProgressBar() {
+    const bar = document.getElementById('prog-bar');
+    if (!bar) return;
+    _progInterval = setInterval(() => {
+        const pos = Tone.Transport.seconds;
+        const pct = _progMaxT > 0 ? Math.min(100, (pos / _progMaxT) * 100) : 0;
+        bar.style.width = pct + '%';
+        if (!isPlaying) { clearInterval(_progInterval); }
+    }, 200);
+}
+function stopProgressBar() {
+    clearInterval(_progInterval);
+    const bar = document.getElementById('prog-bar');
+    if (bar) bar.style.width = '0%';
+}
+
+function setVolume(val) {
+    if (Tone.Destination) {
+        Tone.Destination.volume.value = val === 0 ? -100 : (val / 100) * 40 - 40;
+    }
+}
+
+// ─── HIGHLIGHT HELPERS ────────────────────────────────────────────────────────
+function paintNote(entries, fill) {
+    entries.forEach(({ el }) => {
+        if (!el) return;
+        // Paint every path/rect inside the note group
+        el.querySelectorAll('path, rect').forEach(p => { p.setAttribute('fill', fill); });
+        // Also set on the group itself for stems drawn directly
+        if (fill === GOLD) el.setAttribute('data-lit', '1');
+        else el.removeAttribute('data-lit');
+    });
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+var d = [];
+
+function playNotes() {
+    Tone.Transport.cancel();
+    let maxT = 0;
+    _progMaxT = 0;
+
+    d.forEach(n => {
+        if (n.time + n.duration > maxT) maxT = n.time + n.duration;
+        const key = n.time.toFixed(3);
+
+        // 1. Audio
+        Tone.Transport.schedule(time => {
+            sampler.triggerAttackRelease(n.note, n.duration, time);
+        }, n.time);
+
+        // 2. Highlight + auto-scroll (only schedule if we have elements for this time)
+        if (timeMap[key] && timeMap[key].length) {
+            Tone.Transport.schedule(time => {
+                Tone.Draw.schedule(() => {
+                    const entries = timeMap[key];
+                    // Light up
+                    paintNote(entries, GOLD);
+
+                    // Auto-scroll: keep highlighted note in the top-third of viewport
+                    if (autoScrollEnabled && entries[0] && entries[0].el) {
+                        const rect = entries[0].el.getBoundingClientRect();
+                        const vh = window.innerHeight;
+                        // Only scroll if note is outside comfort zone (20%–65% of viewport)
+                        if (rect.top < vh * 0.2 || rect.top > vh * 0.65) {
+                            const target = window.scrollY + rect.top - vh * 0.3;
+                            window.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+                        }
+                    }
+
+                    // Restore after note duration
+                    setTimeout(() => {
+                        paintNote(entries, entries[0].origFill || '#000');
+                    }, Math.max(80, (n.duration * 1000) - 30));
+                }, time);
+            }, n.time);
+        }
+    });
+
+    Tone.Transport.schedule(() => { isPlaying = false; stopProgressBar(); }, maxT + 0.5);
+    _progMaxT = maxT;
+    Tone.Transport.start();
+}
+
+// ─── PARAMS ───────────────────────────────────────────────────────────────────
+const params = new URLSearchParams(window.location.search);
+const midiPath = params.get('file');
+const songTitle = params.get('title');
+const songComposer = params.get('composer') || '';
+// agentApi is passed by index.js as ?api=http://localhost:3001
+const agentApi = params.get('api') || localStorage.getItem('aurum_agent_url') || 'http://localhost:3001';
+if (songTitle)    document.getElementById('title').textContent = songTitle.toUpperCase();
+if (songComposer) document.getElementById('composer_sub').textContent = songComposer;
+
+// ─── CONTROLS ─────────────────────────────────────────────────────────────────
+function setEQ(band, val) {
+    const db = ((parseFloat(val) / 100) * 24) - 12; // map 0-100 → -12 to +12 dB
+    eq3[band].value = db;
+    const label = document.getElementById('eq-val-' + band);
+    if (label) label.innerText = (db >= 0 ? '+' : '') + db.toFixed(0) + 'dB';
+}
+
+function toggleAutoScroll() {
+    autoScrollEnabled = !autoScrollEnabled;
+    const btn = document.getElementById('scroll-btn');
+    if (btn) {
+        btn.classList.toggle('active', autoScrollEnabled);
+        btn.textContent = (autoScrollEnabled ? '↕' : '↕') + ' SCROLL';
+    }
+}
+
+window.togglePlay = togglePlay;
+window.playNotes = playNotes;
+window.zoom = zoom;
+window.setVolume = setVolume;
+window.toggleAutoScroll = toggleAutoScroll;
+window.setEQ = setEQ;
+window.pause = () => { isPlaying = false; Tone.Transport.pause(); };
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+async function init() {
+    try {
+        const log = document.getElementById('log');
+        log.innerText = "FETCHING VAULT FRAGMENT...";
+        const resp = await fetch(`${agentApi}/api/midi_json?path=${encodeURIComponent(midiPath)}`);
+        d = await resp.json();
+        if (d.error) { log.innerText = "BACKEND ERROR: " + d.error; return; }
+        log.innerText = "COMPILING STRUCTURAL MATRIX...";
+        gS(d);
+        log.innerText = "READY.";
+        window.scrollTo({ top: 0, behavior: "instant" });
+    } catch (e) {
+        document.getElementById('log').innerText = "LOAD ERROR: " + e.message;
+    }
+}
+
+// ─── ZOOM ─────────────────────────────────────────────────────────────────────
+var zoomLevel = 2;
+var zoomSteps = [0.78, 0.88, 1.0, 1.14, 1.30];
+var zoomLabels = ['78%','88%','100%','114%','130%'];
+
+function zoom(dir) {
+    zoomLevel = Math.max(0, Math.min(zoomSteps.length - 1, zoomLevel + dir));
+    const zl = document.getElementById('zl');
+    if (zl) zl.textContent = zoomLabels[zoomLevel];
+    document.getElementById('s').innerHTML = '';
+    gS(d);
+}
+
+// ─── RENDERER ─────────────────────────────────────────────────────────────────
+function gS(data) {
+    var log = document.getElementById('log');
+    if (!data || !data.length) { log.innerText = "ERR: NO NOTE DATA."; return; }
+
+    // Reset timeMap — we rebuild it after every render
+    timeMap = {};
+
+    var ev = [];
+    data.forEach(function(n) {
+        if (n.note) {
+            var f = ev.find(function(e) { return Math.abs(e.t - n.time) < 0.05; });
+            if (f) f.n.push(n); else ev.push({ t: n.time, n: [n] });
+        }
+    });
+    ev.sort(function(a, b) { return a.t - b.t; });
+
+    var mR = [{ t: Array(6).fill(null), b: Array(6).fill(null) }];
+    var cM = 0, cS = 0;
+
+    for (var i = 0; i < ev.length; i++) {
+        var e = ev[i];
+        e.n.forEach(function(n) {
+            try {
+                var o = parseInt(n.note.slice(-1)), k = n.note.toLowerCase().replace(o, '');
+                var vp = k[0] + (k.includes('#') ? '#' : '') + '/' + o;
+                if (!mR[cM].times) mR[cM].times = Array(6).fill(null);
+                mR[cM].times[cS] = e.t;
+                if (o >= 4) {
+                    if (!mR[cM].t[cS]) mR[cM].t[cS] = [];
+                    if (!mR[cM].t[cS].includes(vp)) mR[cM].t[cS].push(vp);
+                } else {
+                    if (!mR[cM].b[cS]) mR[cM].b[cS] = [];
+                    if (!mR[cM].b[cS].includes(vp)) mR[cM].b[cS].push(vp);
+                }
+            } catch(ex) {}
+        });
+
+        if (i < ev.length - 1) {
+            var dt = ev[i + 1].t - e.t;
+            var s = Math.round(dt / 0.188);
+            if (s < 1) s = 1;
+            cS += s;
+            while (cS >= 6) {
+                cS -= 6; cM++;
+                if (!mR[cM]) mR[cM] = { t: Array(6).fill(null), b: Array(6).fill(null) };
+            }
+        }
+        if (cM > 200) break;
+    }
+
+    // bV returns notes with their associated beat time so we can tag SVG elements afterward
+    function bV(hd, clef, times) {
+        var arr = [], bms = [], curB = [], i = 0;
+        function flushB() { if (curB.length > 1) bms.push(new Vex.Flow.Beam(curB)); curB = []; }
+        while (i < 6) {
+            if (hd[i]) {
+                var note = new Vex.Flow.StaveNote({ clef: clef, keys: hd[i], duration: "16" });
+                note._aurum_time = times[i]; // stash time for post-render tagging
+                hd[i].forEach(function(p, idx) {
+                    if (p.includes('#')) note.addAccidental(idx, new Vex.Flow.Accidental("#"));
+                });
+                arr.push(note); curB.push(note); i++;
+            } else {
+                flushB();
+                var eC = 0; while (i + eC < 6 && !hd[i + eC]) eC++;
+                if (eC === 6) { arr.push(new Vex.Flow.StaveNote({ clef: clef, keys: ["b/4"], duration: "4dr" })); i += 6; }
+                else if (eC >= 2 && i % 2 === 0) { arr.push(new Vex.Flow.StaveNote({ clef: clef, keys: ["b/4"], duration: "8r" })); i += 2; }
+                else { arr.push(new Vex.Flow.StaveNote({ clef: clef, keys: ["b/4"], duration: "16r" })); i += 1; }
+            }
+        }
+        flushB();
+        return { n: arr, b: bms };
+    }
+
+    // AUTO-DETECT TIME SIGNATURE from inter-event gap median
+    // Most classical piano MIDIs fit naturally into common time (4/4) or waltz (3/4).
+    // We estimate the beat value by finding the most common small inter-event gap.
+    var timeSig = '4/4';
+    var beats = 4;
+    var beatValue = 4;
+    if (ev.length > 4) {
+        var gaps = [];
+        for (var gi = 1; gi < ev.length; gi++) {
+            var g = ev[gi].t - ev[gi-1].t;
+            if (g > 0.05 && g < 2.0) gaps.push(g);
+        }
+        if (gaps.length) {
+            gaps.sort(function(a,b){return a-b;});
+            var medGap = gaps[Math.floor(gaps.length / 2)];
+            // Estimate 1 beat duration from the median small gap
+            var beatEst = medGap * 2; // median gap ≈ half-beat
+            if (beatEst < 0.22) { timeSig = '3/8'; beats = 6; beatValue = 16; }
+            else if (beatEst < 0.42) { timeSig = '3/4'; beats = 3; beatValue = 4; }
+            else { timeSig = '4/4'; beats = 4; beatValue = 4; }
+        }
+    }
+
+    var scale = zoomSteps[zoomLevel];
+    var sw = window.innerWidth * 0.96;
+    var mPL = Math.max(1, Math.floor(sw / (215 * scale)));
+    var mW = sw / mPL;
+    var rowH = Math.round(180 * scale);
+    var reqH = Math.ceil(mR.length / mPL) * rowH + 80;
+
+    var vf = new Vex.Flow.Factory({ renderer: { elementId: 's', width: sw + 40, height: reqH } });
+    var ctx = vf.getContext();
+    var x = 0, y = 0;
+
+    for (var i = 0; i < mR.length; i++) {
+        if (i !== 0 && i % mPL === 0) { x = 0; y += rowH; }
+        var top = new Vex.Flow.Stave(x, y, mW);
+        var btm = new Vex.Flow.Stave(x, y + rowH * 0.44, mW);
+        if (x === 0) {
+            top.addClef('treble'); btm.addClef('bass');
+            if (i === 0) { top.addTimeSignature(timeSig); btm.addTimeSignature(timeSig); }
+            new Vex.Flow.StaveConnector(top, btm).setType(3).setContext(ctx).draw();
+            new Vex.Flow.StaveConnector(top, btm).setType(1).setContext(ctx).draw();
+        }
+        new Vex.Flow.StaveConnector(top, btm).setType(0).setContext(ctx).draw();
+        top.setContext(ctx).draw(); btm.setContext(ctx).draw();
+
+        var tT = mR[i].times || Array(6).fill(null);
+        var tRes = bV(mR[i].t, "treble", tT);
+        var bRes = bV(mR[i].b, "bass", tT);
+
+        try {
+            // The internal grid is always 6 sixteenth-note slots per measure (= 3/8 of music).
+            // timeSig is shown visually on the stave but the voice always uses SOFT mode so
+            // VexFlow doesn't throw a tick-mismatch error when actual notes vary.
+            var vT = new Vex.Flow.Voice({ num_beats: 6, beat_value: 16 })
+                        .setMode(Vex.Flow.Voice.Mode.SOFT)
+                        .addTickables(tRes.n);
+            var vB = new Vex.Flow.Voice({ num_beats: 6, beat_value: 16 })
+                        .setMode(Vex.Flow.Voice.Mode.SOFT)
+                        .addTickables(bRes.n);
+            new Vex.Flow.Formatter().joinVoices([vT, vB]).format([vT, vB], mW - (x === 0 ? 55 : 22));
+            vT.draw(ctx, top); vB.draw(ctx, btm);
+            tRes.b.forEach(function(b) { b.setContext(ctx).draw(); });
+            bRes.b.forEach(function(b) { b.setContext(ctx).draw(); });
+
+            // POST-RENDER: tag each drawn note's SVG element into timeMap
+            tRes.n.concat(bRes.n).forEach(function(note) {
+                var t = note._aurum_time;
+                if (t == null) return;
+                // VexFlow 3: rendered SVG group lives at note.attrs.el
+                var el = note.attrs && note.attrs.el;
+                if (!el) return;
+                var key = t.toFixed(3);
+                if (!timeMap[key]) timeMap[key] = [];
+                // Capture original fill from first child path (usually black)
+                var firstPath = el.querySelector('path, rect');
+                var origFill = firstPath ? (firstPath.getAttribute('fill') || '#000') : '#000';
+                timeMap[key].push({ el: el, origFill: origFill });
+            });
+
+        } catch (err) {}
+        x += mW;
+    }
+}
+
+window.onload = init;
+
+// ─── PARTICLE FIELD ───────────────────────────────────────────────────────────
+var c = document.getElementById('fx');
+var cx = c.getContext('2d');
+var cw = c.width = window.innerWidth;
+var ch = c.height = window.innerHeight;
+var p = [], mx = cw / 2, my = ch / 2, v = 0;
+for (var i = 0; i < 180; i++) p.push({ x: Math.random() * cw, y: Math.random() * ch, vel: Math.random() * 0.4 + 0.08, vx: 0 });
+document.addEventListener('mousemove', function(e) { v = Math.abs(e.movementX) + Math.abs(e.movementY); mx = e.clientX; my = e.clientY; });
+(function L() {
+    cx.clearRect(0, 0, cw, ch); cx.fillStyle = '#ccc';
+    for (var i = 0; i < p.length; i++) {
+        var t = p[i], dt = Math.hypot(t.x - mx, t.y - my);
+        if (dt < 120) t.vx += (t.x - mx) / dt * (v * 0.04);
+        t.y += t.vel; t.x += t.vx; t.vx *= 0.94;
+        if (t.y > ch) { t.y = 0; t.x = Math.random() * cw; t.vx = 0; }
+        cx.fillRect(t.x, t.y, 1.5, 1.5);
+    }
+    requestAnimationFrame(L);
+})();
+</script>
+</body>
+</html>

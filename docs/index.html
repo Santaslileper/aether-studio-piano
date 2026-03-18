@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AETHER STUDIO // CLASSICAL VAULT</title>
+    <meta name="description" content="Aether Studio — a classical piano MIDI vault. Browse, play and harvest sheet music from 7000+ works by the greatest composers.">
+    <link rel="stylesheet" href="css/index.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;1,400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="studio-wrapper">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <h1>AETHER STUDIO</h1>
+                <button id="debug-btn" class="btn-mini" style="width: auto; padding: 4px 10px;" onclick="toggleLogs()">DEBUG</button>
+            </div>
+            <div id="status-pill" class="status-pill active" style="margin-top: 5px; display: inline-block;">SYSTEM IDLE</div>
+        </div>
+
+        <div class="sidebar-stats">
+            <div class="stat-mini">
+                <span id="sb-stat-composers" class="stat-mini-val">0</span>
+                <span class="stat-mini-lbl">COMPOSERS</span>
+            </div>
+            <div class="stat-mini" id="stat-trigger-works" style="cursor: pointer;" onclick="toggleWorkSort()">
+                <span id="sb-stat-songs" class="stat-mini-val">0</span>
+                <span class="stat-mini-lbl">WORKS ↕</span>
+            </div>
+            <div class="stat-mini" style="border-color: var(--gold-glow)">
+                <span id="sb-stat-midis" class="stat-mini-val" style="color: var(--gold)">0</span>
+                <span class="stat-mini-lbl">SONIC GOLD</span>
+            </div>
+            <div class="stat-mini" title="Works still missing a MIDI file">
+                <span id="sb-stat-missing" class="stat-mini-val" style="color: #ff5555">0</span>
+                <span class="stat-mini-lbl">MISSING</span>
+            </div>
+        </div>
+
+        <div class="sidebar-search">
+            <input type="text" id="lib-search" placeholder="SEARCH... (midi: year:1800 cat:bwv opus:13)" autocomplete="off">
+            <div id="search-hint" class="search-hint"></div>
+            <div class="filter-row" style="display: flex; gap: 5px; margin-top: 10px;">
+                <button class="btn-filter" onclick="setSort('name')">A-Z</button>
+                <button class="btn-filter" onclick="setSort('count')">1-9</button>
+                <select id="range-filter" class="btn-filter" onchange="setRange(this.value)" style="flex: 1;">
+                    <option value="all">ALL RANGES</option>
+                    <option value="0-50">1-50 WORKS</option>
+                    <option value="51-200">51-200 WORKS</option>
+                    <option value="201-9999">200+ WORKS</option>
+                </select>
+            </div>
+            <div class="filter-row" style="margin-top: 8px; gap: 5px;">
+                <button id="btn-compare" class="btn-filter" onclick="toggleCompareMode()" title="Select 2 MIDIs to compare">COMPARE</button>
+                <button id="btn-select" class="btn-filter" onclick="toggleSelectMode()" title="Multi-select for ZIP export">SELECT</button>
+                <button id="btn-export" class="btn-filter btn-gold" onclick="exportZip()" style="display:none;">EXPORT ZIP</button>
+            </div>
+            <div id="compare-hint" class="search-hint" style="display:none;">Select 2 MIDI works to A/B compare</div>
+            <div id="select-hint" class="search-hint" style="display:none;">Click works to select · EXPORT ZIP to download</div>
+            <!-- Live fetch indicator -->
+            <div id="fetch-live-banner" style="display:none; margin-top:8px; padding:6px 10px;
+                 background:rgba(212,175,55,0.07); border:1px solid rgba(212,175,55,0.25);
+                 font-size:0.55rem; color:var(--gold); letter-spacing:1px; text-transform:uppercase;">
+                <span id="fetch-live-msg">⬤ FETCHING FROM WEB...</span>
+            </div>
+        </div>
+
+        <div id="vault-list" class="vault-list">
+            <div style="padding: 40px; text-align: center; opacity: 0.3; font-size: 0.7rem;">INITIALIZING VAULT...</div>
+        </div>
+
+        <div class="sidebar-footer">
+            <button class="btn-mini" onclick="startMetadata()" title="Scan for Composers">RE-SCAN</button>
+            <button class="btn-mini" onclick="startMidi()" title="Harvest MIDIs">HARVEST</button>
+            <button class="btn-mini" onclick="syncVault(event)" title="Merge Data">SYNC</button>
+        </div>
+    </aside>
+
+    <!-- Main Stage -->
+    <main class="stage" style="padding-bottom: 90px; overflow: hidden;">
+        <div id="stage-splash" class="stage-splash">
+            <h2 style="font-family: 'Playfair Display'; font-style: italic; font-weight: normal; margin-bottom: 20px;">LOCKED</h2>
+            <p style="font-size: 0.7rem; opacity: 0.5; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 40px;">SELECT A WORK FROM THE VAULT TO UNLOCK ENGRAVING</p>
+            <div id="splash-stats" class="stats-container" style="display: flex; gap: 30px; margin-bottom: 50px;"></div>
+            <p style="font-size: 0.6rem; opacity: 0.3; text-transform: uppercase; letter-spacing: 4px;">AETHER STUDIO // PROTOCOL STABILIZED</p>
+        </div>
+
+        <iframe id="stage-frame" src="about:blank"></iframe>
+
+        <div id="compare-stage" style="display:none; flex:1; display:none;">
+            <div class="compare-header">
+                <div class="compare-label" id="cmp-label-a">— A —</div>
+                <div class="compare-divider"></div>
+                <div class="compare-label" id="cmp-label-b">— B —</div>
+            </div>
+            <div class="compare-frames">
+                <iframe id="frame-a" src="about:blank"></iframe>
+                <iframe id="frame-b" src="about:blank"></iframe>
+            </div>
+            <div class="compare-controls">
+                <button class="btn-transport" onclick="triggerComparePlay('a')">▶ PLAY A</button>
+                <button class="btn-transport" onclick="triggerComparePlay('b')">▶ PLAY B</button>
+                <button class="btn-transport" onclick="triggerComparePlay('both')">▶ BOTH</button>
+                <button class="btn-transport btn-gold-border" onclick="exitCompareMode()">EXIT COMPARE</button>
+            </div>
+        </div>
+
+        <!-- Transport bar -->
+        <div class="transport-bar">
+            <div class="now-playing-info">
+                <span id="np-title" class="np-title">AWAITING SELECTION</span>
+                <span id="np-composer" class="np-composer">AETHER SYSTEM // PROTOCOL STABILIZED</span>
+            </div>
+            <div class="transport-controls">
+                <button id="p-btn" class="btn-transport" onclick="triggerPlay()">PLAY</button>
+                <div style="width:1px; height:20px; background:rgba(255,255,255,0.1); margin: 0 10px;"></div>
+                <button class="btn-transport" onclick="triggerZoom(-1)">− ZOOM</button>
+                <button class="btn-transport" onclick="triggerZoom(+1)">+ ZOOM</button>
+                <div style="width:1px; height:20px; background:rgba(255,255,255,0.1); margin: 0 10px;"></div>
+                <div class="volume-container" style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 0.6rem; opacity: 0.5;">VOL</span>
+                    <input type="range" id="vol-slider" min="0" max="100" value="80" class="slider" oninput="triggerVolume(this.value)">
+                </div>
+                <div class="kbd-hint" title="Keyboard Shortcuts">
+                    <kbd>SPACE</kbd>play &nbsp;
+                    <kbd>=</kbd><kbd>-</kbd>zoom &nbsp;
+                    <kbd>F</kbd>search
+                </div>
+            </div>
+            <div class="transport-stats" style="min-width: 200px; text-align: right; font-size: 0.6rem; opacity: 0.4;">
+                <span id="stat-composers">0</span> COMPOSERS / <span id="stat-songs">0</span> WORKS<br>
+                <span id="stat-midis">0</span> SONIC GOLD COLLECTED
+            </div>
+        </div>
+    </main>
+
+    <!-- Terminal Overlay -->
+    <div id="log-panel" class="log-panel" style="display: none;">
+        <div class="log-header">
+            <span>AETHER_SYSTEM_MONITOR.sh</span>
+            <button onclick="toggleLogs()" style="background: none; border: none; color: #fff; cursor: pointer;">✕</button>
+        </div>
+        <div id="log-content" class="log-content"></div>
+    </div>
+</div>
+
+<script src="js/index.js"></script>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     AGENT OFFLINE OVERLAY
+     Shown when the local agent at localhost:3001 is unreachable.
+     Once the agent is up this is automatically hidden.
+═══════════════════════════════════════════════════════════════════ -->
+<div id="agent-offline" style="display:none; position:fixed; inset:0; background:#050505; z-index:9999; flex-direction:column; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace;">
+  <h1 style="color:#d4af37; font-family:'Playfair Display',serif; font-style:italic; font-weight:normal; font-size:2rem; margin-bottom:16px;">AETHER STUDIO</h1>
+  <p style="color:rgba(255,255,255,0.4); font-size:0.65rem; letter-spacing:3px; text-transform:uppercase; margin-bottom:40px;">Local agent not detected</p>
+  <div style="border:1px solid rgba(255,255,255,0.1); padding:32px 40px; max-width:560px; width:90%;">
+    <p style="color:rgba(255,255,255,0.7); font-size:0.7rem; line-height:1.8; margin:0 0 20px;">
+      Aether Studio needs a small local agent running on your machine to access MIDI files and scrape new ones.
+    </p>
+    <p style="color:#d4af37; font-size:0.65rem; letter-spacing:2px; margin-bottom:10px; text-transform:uppercase;">One-time install (Windows):</p>
+    <div id="install-box" style="background:#0a0a0a; border:1px solid rgba(212,175,55,0.3); padding:14px 16px; font-size:0.7rem; color:#00ff00; word-break:break-all; cursor:pointer; position:relative;" onclick="copyInstall(this)" title="Click to copy">
+      <span id="install-cmd">irm https://raw.githubusercontent.com/Santaslileper/aether-studio-piano/main/install.ps1 | iex</span>
+      <span style="position:absolute; right:10px; top:50%; transform:translateY(-50%); font-size:0.5rem; color:rgba(255,255,255,0.3);">CLICK TO COPY</span>
+    </div>
+    <p style="color:rgba(255,255,255,0.3); font-size:0.55rem; margin:12px 0 0; line-height:1.6;">
+      Paste into PowerShell. Installs Python deps + Chromium, starts the agent. After install, double-click the desktop shortcut.
+    </p>
+    <div style="margin-top:24px; display:flex; gap:12px; align-items:center;">
+      <button onclick="checkAgent()" style="flex:1; background:none; border:1px solid #d4af37; color:#d4af37; font-family:'JetBrains Mono',monospace; font-size:0.65rem; padding:10px; cursor:pointer; text-transform:uppercase; letter-spacing:2px;">Check Again</button>
+      <input id="port-input" placeholder="Port (default 3001)" style="flex:1; background:none; border:1px solid rgba(255,255,255,0.15); color:#fff; font-family:'JetBrains Mono',monospace; font-size:0.65rem; padding:10px; box-sizing:border-box;" oninput="updateAgentUrl(this.value)">
+    </div>
+  </div>
+  <p style="color:rgba(255,255,255,0.15); font-size:0.5rem; margin-top:24px; letter-spacing:2px; text-transform:uppercase;">AETHER STUDIO // AWAITING CONNECTION</p>
+</div>
+
+<script>
+// ── Agent connectivity ────────────────────────────────────────────────────────
+function getAgentUrl() {
+    return localStorage.getItem('aurum_agent_url') || 'http://localhost:3001';
+}
+
+function updateAgentUrl(val) {
+    const v = val.trim();
+    if (!v) return;
+    const url = v.startsWith('http') ? v : `http://localhost:${v}`;
+    localStorage.setItem('aurum_agent_url', url);
+}
+
+function copyInstall(el) {
+    navigator.clipboard.writeText(document.getElementById('install-cmd').innerText)
+        .then(() => {
+            el.style.borderColor = '#00ff00';
+            setTimeout(() => el.style.borderColor = 'rgba(212,175,55,0.3)', 1500);
+        }).catch(() => {});
+}
+
+async function checkAgent() {
+    const url = getAgentUrl();
+    const overlay = document.getElementById('agent-offline');
+    try {
+        const r = await fetch(`${url}/api/status`, { signal: AbortSignal.timeout(2500) });
+        if (r.ok) {
+            overlay.style.display = 'none';
+            // Trigger init() from index.js if it hasn't run yet or re-run fetch
+            if (typeof fetchStats === 'function') fetchStats();
+            if (typeof fetchLibrary === 'function') fetchLibrary();
+        } else {
+            throw new Error('bad status');
+        }
+    } catch {
+        overlay.style.display = 'flex';
+    }
+}
+
+// Check on load — hide overlay immediately if agent is already running
+window.addEventListener('load', () => {
+    const stored = localStorage.getItem('aurum_agent_url');
+    if (stored) {
+        const portInput = document.getElementById('port-input');
+        if (portInput) portInput.placeholder = stored;
+    }
+    checkAgent();
+});
+
+// Recheck every 3s while offline so it auto-connects when the agent starts
+setInterval(checkAgent, 3000);
+</script>
+
+</body>
+</html>
