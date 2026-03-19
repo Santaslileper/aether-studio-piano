@@ -6,6 +6,9 @@ import { INSTRUMENT_GROUPS } from './audio.js';
 import { fmtTime, getShiftedNote, countConsecutive } from './utils.js';
 
 export function setupUI(handlers) {
+    const apiBase = 'http://127.0.0.1:3001';
+    initConnectionManager(apiBase);
+    
     const { 
         startAutoplay, stopAutoplay, switchSong, selectSong, deleteSong,
         startNarrator, stopNarrator, setSustain, triggerFootBass,
@@ -44,28 +47,32 @@ export function setupUI(handlers) {
                 .map(([k, s]) => `<div class="search-item local" data-key="${k}"><span>${s.name}</span><span class="badge local">Local</span></div>`).join('');
 
             try {
-                // BYPASS: If term looks like a URL, allow direct download
-                if (term.match(/^https?:\/\/.*\.mid(i)?$/i)) {
-                    searchResults.innerHTML = `<div class="search-item direct-dl" data-url="${term}"><span>Direct Import: ${term.split('/').pop()}</span><span class="badge">Bypass</span></div>` + currentLocalHtml;
-                    searchResults.classList.remove('hidden');
-                    return;
-                }
-
-                const apiBase = 'http://127.0.0.1:3001';
+                // 1. Try local database search via agent
                 const res = await fetch(`${apiBase}/search?q=${encodeURIComponent(term)}`);
                 if (!res.ok) throw new Error();
-                const online = await res.json();
+                const dbResults = await res.json();
                 
-                const filtered = online.filter(r => {
-                   const n = r.name.toLowerCase();
-                   return !n.includes('random midi') && !n.includes('privacy') && !n.includes('about bitmidi') && !n.includes('terms') && !n.includes('contact');
-                });
-                const onlineHtml = filtered.map(r => `<div class="search-item online" data-path="${r.path}" data-name="${r.name}">${r.name} <span class="badge">BitMidi</span></div>`).join('');
-                
+                let onlineHtml = '';
+                if (dbResults.length > 0) {
+                    onlineHtml = dbResults.map(r => `<div class="search-item online" data-path="${r.midi_file_path}" data-name="${r.title}">${r.title} <span class="badge">Agent</span></div>`).join('');
+                } else {
+                    // 2. No local results? Try on-the-fly harvest
+                    searchResults.innerHTML = currentLocalHtml + '<div class="search-item" style="opacity:.5">Searching online...</div>';
+                    const harvestRes = await fetch(`${apiBase}/fetch_query?q=${encodeURIComponent(term)}`);
+                    if (harvestRes.ok) {
+                        const harvestData = await harvestRes.json();
+                        if (harvestData.results && harvestData.results.length > 0) {
+                            onlineHtml = harvestData.results.map(r => `<div class="search-item online" data-path="${r.path}" data-name="${r.name}">${r.name} <span class="badge">BitMidi</span></div>`).join('');
+                        }
+                    }
+                }
+
                 if (currentLocalHtml || onlineHtml) { 
                     searchResults.innerHTML = currentLocalHtml + onlineHtml; 
                     searchResults.classList.remove('hidden'); 
                     searchResults.style.display = 'block';
+                } else {
+                    searchResults.innerHTML = currentLocalHtml + '<div class="search-item" style="opacity:.5">No results found online.</div>';
                 }
             } catch (_) { 
                 if (currentLocalHtml) {
@@ -74,7 +81,7 @@ export function setupUI(handlers) {
                     searchResults.innerHTML = '<div class="search-item" style="opacity:.5; justify-content:center">Paste a MIDI URL here to Import Directly</div>';
                 }
             }
-        }, 500);
+        }, 600);
     });
 
     document.addEventListener('click', e => {

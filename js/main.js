@@ -55,9 +55,9 @@ async function init() {
                 data: null
             };
         }
+        console.log(`Successfully loaded ${assetFiles.length} songs from manifest.`);
     } catch (e) {
         console.error('Failed to load songs manifest:', e);
-        // Fallback to minimal hardcoded list if fetch fails
     }
 
     // Load extra saved songs from localStorage
@@ -66,6 +66,8 @@ async function init() {
         Object.assign(state.playlists, saved);
     } catch (_) {}
 
+    const playlistCount = Object.keys(state.playlists).length;
+    console.log(`Library populated with ${playlistCount} songs.`);
     updateLibraryUI();
 
     // 4. Load Last Song or Default
