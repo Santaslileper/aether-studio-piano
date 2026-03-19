@@ -24,17 +24,17 @@ export function setupUI(handlers) {
 
         const local = Object.entries(state.playlists)
             .filter(([, s]) => s.name.toLowerCase().includes(term.toLowerCase()))
-            .slice(0, 10); // Limit results for performance
-        let html = local.map(([k, s]) => `<div class="search-item local" data-key="${k}"><span>${s.name}</span><span class="badge local">Library</span></div>`).join('');
+            .slice(0, 10);
         
-        if (html) { 
-            searchResults.innerHTML = html; 
-            searchResults.classList.remove('hidden'); 
+        const localHtml = local.map(([k, s]) => `<div class="search-item local" data-key="${k}"><span>${s.name}</span><span class="badge local">Library</span></div>`).join('');
+        
+        if (localHtml) {
+            searchResults.innerHTML = localHtml;
+            searchResults.classList.remove('hidden');
             searchResults.style.display = 'block';
-        }
-        else { 
-            searchResults.innerHTML = '<div class="search-item" style="opacity:.5">No results</div>'; 
-            searchResults.classList.remove('hidden'); 
+        } else {
+            searchResults.innerHTML = '<div class="search-item" style="opacity:.5">Searching...</div>';
+            searchResults.classList.remove('hidden');
             searchResults.style.display = 'block';
         }
 
@@ -51,8 +51,7 @@ export function setupUI(handlers) {
                     return;
                 }
 
-                const isLocal = ['http:', 'file:'].includes(location.protocol);
-                const apiBase = isLocal ? 'http://127.0.0.1:3001' : '';
+                const apiBase = 'http://127.0.0.1:3001';
                 const res = await fetch(`${apiBase}/search?q=${encodeURIComponent(term)}`);
                 if (!res.ok) throw new Error();
                 const online = await res.json();
@@ -125,8 +124,7 @@ export function setupUI(handlers) {
                     });
                     sequence = [...notes, ...pedalEvents].sort((a, b) => a.time - b.time);
                 } else {
-                    const isLocal = ['http:', 'file:'].includes(location.protocol);
-                    const apiBase = isLocal ? 'http://127.0.0.1:3001' : '';
+                    const apiBase = 'http://127.0.0.1:3001';
                     const res = await fetch(`${apiBase}/download?path=${encodeURIComponent(path)}`);
                     if (!res.ok) throw new Error();
                     sequence = await res.json();
